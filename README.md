@@ -42,6 +42,17 @@ Create `data/<id>.js` that registers `window.COURSES.<id>` (see `data/mainz.js`:
 - External requests: Esri satellite tiles (satellite view only) and OpenStreetMap (only when the user taps *Platzdaten laden*).
 - iOS: use the app from the home screen. Safari deletes storage of regular websites after 7 days without a visit; home-screen web apps are exempt. The home-screen app and the Safari tab have **separate** storage.
 
+## Satellite imagery (Esri API key)
+
+The satellite view uses Esri World Imagery. For use beyond personal testing, Esri expects an API key:
+
+1. Create a free account at [ArcGIS Location Platform](https://location.arcgis.com/).
+2. Create an API key with only the *Basemaps* privilege.
+3. Restrict it to the site's referrers (the Netlify domain, plus deploy-preview domains if wanted).
+4. Put it into `config.js` (`esriKey`). The key is public by nature; the referrer restriction is what protects it.
+
+Without a key the app falls back to the public tile endpoint.
+
 ## Running locally
 
 Any static file server works, for example:

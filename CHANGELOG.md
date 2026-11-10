@@ -7,6 +7,7 @@
 - App icon (flag on a green) as favicon, bookmark and home-screen icon; web app manifest
 - Hole view drawn from the tee signs for holes 2, 4–6 and 9–18: outline, trees, bunkers, water and doglegs; shown even before tee and green are set (distances from the tee). Once tee and green are set, the layout is placed on the real hole and its bunkers and water count for distances, unless own markings or OpenStreetMap data exist.
 - Multiple courses: course picker in the course tab, Mainzer Golfclub (Budenheim, 18 holes) added with par, stroke index and ratings for white, yellow, blue, red and green tees. Hole data, running round and tee are kept per course; history is tagged by course; backups include all courses.
+- Optional Esri API key in `config.js` for the satellite view (keyed basemap endpoint)
 
 ## 2026-11-10 — Repository setup
 
