@@ -287,14 +287,14 @@ document.addEventListener("visibilitychange",wake);wake();
 // ---------- Anzeige ----------
 function update(){
   const n=ui.hole,g=greenOf(n),h=course.holes[n]||{};
-  $("holeinfo").innerHTML=`<div class="n">Loch ${n}${cur().mode&&cur().mode!=="18"?'<small style="font-size:13px;color:var(--muted);font-family:var(--body);font-weight:600"> · 9er</small>':""}</div><div class="p">Par ${h.par||"–"}${h.hcp?" · Hcp "+h.hcp:""}${(()=>{const k=strokesRecv(n);return k?` · <span title="Vorgabeschläge">${dots(k)}</span>`:""})()}${scoreTxt(n)}</div>`;
+  $("holeinfo").innerHTML=`<div class="n">Loch ${n}${ui.tourney&&!viewRound?'<span class="tbadge">Turnier</span>':""}${cur().mode&&cur().mode!=="18"?'<small style="font-size:13px;color:var(--muted);font-family:var(--body);font-weight:600"> · 9er</small>':""}</div><div class="p">Par ${h.par||"–"}${h.hcp?" · Hcp "+h.hcp:""}${(()=>{const k=strokesRecv(n);return k?` · <span title="Vorgabeschläge">${dots(k)}</span>`:""})()}${scoreTxt(n)}</div>`;
   if(me&&g){
     const c=dist(me,g.c);
     let f=g.f?dist(me,g.f):g.poly?nearestOnPoly(me,g.poly):null;
     let b=g.b?dist(me,g.b):g.poly?farOnPoly(me,g.poly):null;
     if(f==null&&h.depth)f=Math.max(0,c-h.depth/2);if(b==null&&h.depth)b=c+h.depth/2;
     $("dC").innerHTML=`${m(c)}<small>m</small>`;$("dF").textContent=m(f);$("dB").textContent=m(b);
-    const sg=suggest(c);$("sugg").innerHTML=sg?`Dein Schläger für ${m(c)} m: <b>${sg.c}</b> (Ø ${m(sg.avg)} m)`:"";
+    const sg=ui.tourney?null:suggest(c);$("sugg").innerHTML=sg?`Dein Schläger für ${m(c)} m: <b>${sg.c}</b> (Ø ${m(sg.avg)} m)`:"";
   }else{$("dC").innerHTML=g?"–":'<span style="font-size:22px">kein Grün</span>';$("dF").textContent="–";$("dB").textContent="–"}
   // Hindernisse
   const hz=$("hazards");hz.innerHTML="";
@@ -378,7 +378,7 @@ $("btnShot").onclick=()=>{if(viewRound)return;if(!me){toast("Noch keine Position
   shotMode="";document.querySelectorAll("[data-mode]").forEach(x=>x.classList.remove("sel"));
   if(meAcc>25)$("clubSub").textContent=`GPS gerade ±${Math.round(meAcc)} m ungenau – Weite kann abweichen.`;
   else $("clubSub").textContent="Position wird gespeichert. Die Weite ergibt sich beim nächsten Schlag oder mit „Auf dem Grün“.";
-  const av=clubAvgs(),g=greenOf(ui.hole),sg=g?suggest(dist(me,g.c)):null,last=ui.lastClub;
+  const av=clubAvgs(),g=greenOf(ui.hole),sg=g&&!ui.tourney?suggest(dist(me,g.c)):null,last=ui.lastClub;
   grid.querySelectorAll("button").forEach(b=>{const c=b.dataset.club,v=av[c];
     b.innerHTML=`${c}<small>${v?"Ø "+m(v.avg)+" m":"–"}</small>`;
     b.classList.toggle("sel",sg?sg.c===c:c===last)});
@@ -591,7 +591,9 @@ function renderPlayer(){
   const r18={mode:"18",tee:t,hcpi:ui.hcpi,sex:sx,holes:{}},r9={mode:"f9",tee:t,hcpi:ui.hcpi,sex:sx,holes:{}};
   const c18=courseHcp(r18),c9=courseHcp(r9);
   $("phcp").innerHTML=c18==null?'<span class="muted">HCPI eintragen, dann rechnet die App Spielvorgabe und Stableford-Punkte.</span>':`<div><span>Spielvorgabe 18 Löcher</span><b>${c18}</b></div><div><span>Spielvorgabe 9 Löcher</span><b>${c9}</b></div>`;
+  $("tourneyIn").checked=!!ui.tourney;
   renderBag()}
+$("tourneyIn").addEventListener("change",()=>{ui.tourney=$("tourneyIn").checked;save(K.ui,ui);update();toast(ui.tourney?"Turniermodus an: keine Schlägerempfehlung":"Turniermodus aus")});
 $("hcpiIn").addEventListener("input",()=>{const v=$("hcpiIn").value.trim().replace(",",".");
   if(v===""){ui.hcpi=null}else{const x=parseFloat(v);if(isNaN(x)||x<-10||x>54){$("hcpiIn").classList.add("bad");return}ui.hcpi=Math.round(x*10)/10}
   $("hcpiIn").classList.remove("bad");save(K.ui,ui);syncRoundSettings();renderPlayer();update()});

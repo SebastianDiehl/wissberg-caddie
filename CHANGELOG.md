@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Tournament mode in the player tab: hides the club recommendation (not allowed in competition under Rule 4.3); a "Turnier" badge shows in the header
+- "Unofficial, distances without warranty" notice in the guide and the course tab
+
 ## 2026-11-10 — Repository setup
 
 - Split the single-file app into `index.html`, `style.css`, `app.js`, `data/rheinhessen.js` and `vendor/`.

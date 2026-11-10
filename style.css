@@ -175,3 +175,12 @@ p.note{font-size:13px;color:var(--muted);line-height:1.5;margin:6px 0}
 .shotdot{width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #14231a}
 input[type=text],select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
+.switch span{display:grid;gap:2px;font-size:14px}.switch small{font-size:12px;color:var(--muted);line-height:1.4}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch i{flex:none;width:50px;height:30px;border-radius:999px;background:var(--line);position:relative;transition:background .15s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked+i{background:var(--accent)}.switch input:checked+i::after{transform:translateX(20px)}
+.switch input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}
+.tbadge{font-family:var(--body);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);border:1px solid var(--warn);border-radius:5px;padding:1px 4px;margin-left:6px;vertical-align:middle}
+.disclaimer{font-size:12px;color:var(--muted);line-height:1.45;margin:14px 2px 0}
