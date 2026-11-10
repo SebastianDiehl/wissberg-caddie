@@ -29,6 +29,7 @@ Before starting something bigger, open an issue or say who is working on what, s
 - Course facts live in `data/rheinhessen.js`.
 - Only facts (par, stroke index, distances, positions). Do not commit photos of tee signs, the club logo or copied graphics.
 - Note the source of new data in the PR description.
+- `holes[n].map` is traced from the tee signs (see the comment in the data file). Holes 1, 3, 7 and 8 are still missing; tracing them needs a straight-on photo of each sign.
 
 ## Testing a change
 

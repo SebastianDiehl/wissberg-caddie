@@ -76,11 +76,23 @@ function drawCourse(){
 function greenOf(n){const h=course.holes[n];if(!h)return null;
   const c=h.greenC||(h.greenPoly?centroid(h.greenPoly):null);if(!c)return null;
   return{c,poly:h.greenPoly||null,f:h.greenF||null,b:h.greenB||null}}
-function holeLine(n){const h=course.holes[n]||{};if(h.line&&h.line.length>1)return h.line;const g=greenOf(n);if(h.tee&&g)return h.dog?[h.tee,h.dog,g.c]:[h.tee,g.c];return null}
-function hazardsOf(n){
-  const h=course.holes[n]||{};const line=holeLine(n);
+// Hole layout traced from the tee sign (data file), in metres: tee [0,0], +y towards the green, +x right
+function sign(n){return (SCORECARD[n]||{}).map||null}
+function teeOf(n){const h=course.holes[n]||{};return h.line&&h.line.length>1?h.line[0]:(h.tee||null)}
+// Places the sign layout on the real hole once tee and green are known (scaled to the real length)
+function signGeo(n){const tm=sign(n),t=teeOf(n),g=greenOf(n);if(!tm||!t||!g)return null;const F=makeFrame(t,g.c),k=F.L/tm.len;return{F,k,B:p=>F.back(p[0]*k,-p[1]*k)}}
+function holeLine(n){const h=course.holes[n]||{};if(h.line&&h.line.length>1)return h.line;const g=greenOf(n);
+  if(h.tee&&g){if(h.dog)return[h.tee,h.dog,g.c];const tm=sign(n),sg=tm&&tm.path.length>2?signGeo(n):null;
+    return sg?[h.tee,...tm.path.slice(1,-1).map(sg.B),g.c]:[h.tee,g.c]}
+  return null}
+function ownHazards(n){
+  const line=holeLine(n);
   return course.hazards.filter(z=>{if(z.hole!=null)return z.hole==n;if(!line)return false;const c=z.poly?centroid(z.poly):z.pt;return distToLine(c,line)<55});
 }
+function signHazards(n,B){const tm=sign(n);if(!tm)return[];
+  return tm.bunkers.map(p=>({type:"bunker",poly:p.map(B),sign:true})).concat(tm.water.map(p=>({type:"water",poly:p.map(B),sign:true})))}
+// Own markings and OpenStreetMap data win; otherwise use the sign layout (approximate)
+function hazardsOf(n){const own=ownHazards(n);if(own.length)return own;const sg=signGeo(n);return sg?signHazards(n,sg.B):[]}
 function drawHole(){
   layers.hole.clearLayers();const n=ui.hole,g=greenOf(n),h=course.holes[n]||{};
   const line=holeLine(n);
@@ -105,7 +117,7 @@ function focusHole(){
 // ---------- Bahnansicht (Stil der Abschlagtafeln) ----------
 const HV={rough:"#7ccf4f",outline:"#3e4f2c",fairway:"#4fa83f",stripe:"#5cb84a",green:"#9be36a",greenLine:"#3f8f34",sand:"#f2d27c",sandLine:"#c9a24a",water:"#3a86d6",waterLine:"#1f5fa8",tree:"#2f6b2a",treeLine:"#1d4719",line:"#1b2a17"};
 const SVGNS="http://www.w3.org/2000/svg";
-let hvFrame=null;
+let hvFrame=null,hvSynth=false;
 function hvEl(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
 function makeFrame(tee,green){
   const P=proj(tee),v=P(green),L=Math.hypot(v[0],v[1]),th=Math.atan2(v[0],v[1]),c=Math.cos(th),sn=Math.sin(th);
@@ -118,20 +130,26 @@ function plen(pts){let s=0;for(let i=0;i<pts.length-1;i++)s+=Math.hypot(pts[i+1]
 function subLine(pts,d0,d1){const out=[along(pts,d0).p];let acc=0;for(let i=0;i<pts.length-1;i++){const l=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);acc+=l;if(acc>d0&&acc<d1)out.push(pts[i+1])}out.push(along(pts,d1).p);return out}
 const ptsAttr=a=>a.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
 function renderHoleView(){
-  const svg=$("hvSvg"),msg=$("hvMsg"),n=ui.hole,h=course.holes[n]||{},g=greenOf(n);
+  const svg=$("hvSvg"),msg=$("hvMsg"),n=ui.hole,h=course.holes[n]||{},tm=sign(n);let g=greenOf(n);
   svg.innerHTML="";
-  const lineLL=holeLine(n);
+  let lineLL=holeLine(n);
+  // Without tee/green positions: draw the sign layout on a stand-in position (no live distances)
+  hvSynth=(!g||!lineLL)&&!!tm;
+  if(hvSynth){const t0=COURSE_GUESS,gS=[t0[0]+tm.len/R/rad,t0[1]],Fs=makeFrame(t0,gS);g={c:gS,poly:null,f:null,b:null};lineLL=[t0,...tm.path.slice(1,-1).map(p=>Fs.back(p[0],-p[1])),gS]}
   if(!g||!lineLL){msg.hidden=false;msg.innerHTML=`Für Loch ${n} fehlen noch Abschlag und Grün.<br>Setze beides einmal in der Satellitenansicht (Tab „Platz“ → „Abschlag“ und „Grün Mitte“).<button class="btn primary" id="hvToSat">Zur Satellitenansicht</button>`;$("hvToSat").onclick=()=>setView("sat");return}
   msg.hidden=true;
   const tee=lineLL[0],F=makeFrame(tee,g.c);hvFrame=F;
   const line=lineLL.map(F.to);line[line.length-1]=F.to(g.c);
   const L=plen(line),gc=F.to(g.c),depth=h.depth||30,par=h.par||(L>430?5:L>220?4:3);
+  const k=tm?F.L/tm.len:1,S=p=>[p[0]*k,-p[1]*k],Bk=p=>F.back(p[0]*k,-p[1]*k);
+  const hz=hvSynth?signHazards(n,Bk):hazardsOf(n);
   // Spieler nur zeigen, wenn er auf/nahe dieser Bahn ist
-  const meXY=me?F.to(me):null,onHole=!viewRound&&me&&distToLine(me,lineLL)<120;
+  const meXY=me?F.to(me):null,onHole=!viewRound&&!hvSynth&&me&&distToLine(me,lineLL)<120;
   // Ausschnitt bestimmen
   // ganze Bahn inkl. Rand (Radius 52 m) und aller Hindernisse
   let xs=[],ys=[];line.forEach(p=>{xs.push(p[0]-56,p[0]+56);ys.push(p[1]-56,p[1]+56)});
-  for(const z of hazardsOf(n)){(z.poly||[z.pt]).forEach(q=>{const a=F.to(q),r=z.poly?2:(z.type==="water"?22:10);xs.push(a[0]-r,a[0]+r);ys.push(a[1]-r,a[1]+r)})}
+  for(const z of hz){(z.poly||[z.pt]).forEach(q=>{const a=F.to(q),r=z.poly?2:(z.type==="water"?22:10);xs.push(a[0]-r,a[0]+r);ys.push(a[1]-r,a[1]+r)})}
+  if(tm)tm.outline.forEach(p=>{const a=S(p);xs.push(a[0]);ys.push(a[1])});
   if(onHole){xs.push(meXY[0]-20,meXY[0]+20);ys.push(meXY[1]-20,meXY[1]+20)}
   const box=svg.getBoundingClientRect(),W=box.width||360,Hh=box.height||500;
   const padTop=86,padBot=16,padX=16;
@@ -152,9 +170,11 @@ function renderHoleView(){
   const pl=(pts,stroke,w,extra)=>hvEl("polyline",Object.assign({points:ptsAttr(pts),fill:"none",stroke,"stroke-width":w,"stroke-linecap":"round","stroke-linejoin":"round"},extra||{}),layer);
   // Spielbahn: Rand, Rough
   const corridor=line.slice();corridor[corridor.length-1]=[gc[0],gc[1]-depth*.35];
-  pl(corridor,HV.outline,104);pl(corridor,HV.rough,94);
-  // Bäume am Rand
-  for(let d=10;d<L+10;d+=19){for(const side of[-1,1]){const r=rnd(n*131+d*7+side);if(r<.35)continue;const a=along(corridor,Math.min(d,plen(corridor))),nx=-a.dir[1]*side,ny=a.dir[0]*side,off=46+r*5;
+  if(tm){hvEl("polygon",{points:ptsAttr(tm.outline.map(S)),fill:HV.rough,stroke:HV.outline,"stroke-width":5,"stroke-linejoin":"round"},layer);
+    tm.trees.forEach(([x,y,r])=>{const p=S([x,y]);hvEl("circle",{cx:p[0],cy:p[1],r:r*k,fill:HV.tree,stroke:HV.treeLine,"stroke-width":1.2},layer)})}
+  else{pl(corridor,HV.outline,104);pl(corridor,HV.rough,94);}
+  // Bäume am Rand (geschätzt, wenn keine Tafel-Daten)
+  if(!tm)for(let d=10;d<L+10;d+=19){for(const side of[-1,1]){const r=rnd(n*131+d*7+side);if(r<.35)continue;const a=along(corridor,Math.min(d,plen(corridor))),nx=-a.dir[1]*side,ny=a.dir[0]*side,off=46+r*5;
     const p=[a.p[0]+nx*off,a.p[1]+ny*off];hvEl("circle",{cx:p[0],cy:p[1],r:3.6+r*2.4,fill:HV.tree,stroke:HV.treeLine,"stroke-width":1.2},layer)}}
   // Fairway: aus OSM oder geschätzt
   const fws=(h.fairways||[]);
@@ -167,7 +187,7 @@ function renderHoleView(){
   const ta=along(line,0);
   teeCols.forEach(([col,o])=>{const p=[ta.p[0]+ta.dir[0]*o,ta.p[1]+ta.dir[1]*o];hvEl("rect",{x:p[0]-4,y:p[1]-2.6,width:8,height:5.2,rx:1.4,fill:col,stroke:"#333","stroke-width":.6},layer)});
   // Wasser und Bunker
-  for(const z of hazardsOf(n)){const isW=z.type==="water";
+  for(const z of hz){const isW=z.type==="water";
     if(z.poly)hvEl("polygon",{points:ptsAttr(z.poly.map(F.to)),fill:isW?HV.water:HV.sand,stroke:isW?HV.waterLine:HV.sandLine,"stroke-width":1.4,"stroke-linejoin":"round"},layer);
     else{const p=F.to(z.pt),r=isW?16:7;hvEl("ellipse",{cx:p[0],cy:p[1],rx:r*1.25,ry:r*.85,fill:isW?HV.water:HV.sand,stroke:isW?HV.waterLine:HV.sandLine,"stroke-width":1.4},layer)}}
   // Grün
@@ -214,7 +234,7 @@ function renderHoleView(){
     tagC(fP,m(fD),true);tagC(bP,m(bD),false);}
   // Hindernisse: Distanz an die Vorderkante
   const cD=dist(ref,g.c);
-  for(const z of hazardsOf(n)){let fp,near;
+  for(const z of hz){let fp,near;
     if(z.poly){let bi=0,bd=1e9;z.poly.forEach((q,i)=>{const d=dist(ref,q);if(d<bd){bd=d;bi=i}});near=nearestOnPoly(ref,z.poly);fp=F.to(z.poly[bi])}
     else{const c=F.to(z.pt),r=z.type==="water"?16:7,v=[refXY[0]-c[0],refXY[1]-c[1]],l=Math.hypot(v[0],v[1])||1;fp=[c[0]+v[0]/l*r*.85,c[1]+v[1]/l*r*.85];near=Math.max(0,dist(ref,z.pt)-r)}
     if(near>cD+15)continue;
@@ -224,7 +244,8 @@ function renderHoleView(){
   // Spieler
   if(onHole){hvEl("circle",{cx:meXY[0],cy:meXY[1],r:px(16),fill:"rgba(45,140,255,.25)"},layer);
     hvEl("circle",{cx:meXY[0],cy:meXY[1],r:px(8),fill:"#2d8cff",stroke:"#fff","stroke-width":px(3)},layer)}
-  $("hvNote").hidden=!(me&&!onHole)||!!viewRound;
+  $("hvNote").textContent=hvSynth?"Grafik nach Abschlagtafel · Distanzen ab Abschlag":"Du bist gerade nicht auf dieser Bahn";
+  $("hvNote").hidden=hvSynth?false:(!(me&&!onHole)||!!viewRound);
 }
 // ---------- Verschieben und Zoomen ----------
 let hvBase=null,hvZoom={k:1,ox:0,oy:0},hvMoved=false;
@@ -256,7 +277,7 @@ function zoomAt(f,clientX,clientY){const b=hvBase;if(!b)return;const r=$("hvSvg"
   svg.addEventListener("wheel",e=>{e.preventDefault();zoomAt(Math.exp(-e.deltaY*.002),e.clientX,e.clientY);schedule()},{passive:false});
   let lastTap=0;svg.addEventListener("pointerup",e=>{const t=Date.now();if(!hvMoved&&t-lastTap<300){resetZoom();hvMoved=true;setTimeout(()=>hvMoved=false,50)}lastTap=t});
   $("hvReset").onclick=resetZoom;}
-$("hvSvg").addEventListener("click",e=>{if(!hvFrame||hvMoved)return;const svg=$("hvSvg"),pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+$("hvSvg").addEventListener("click",e=>{if(!hvFrame||hvMoved)return;if(hvSynth){toast("Für Layup-Messungen Abschlag und Grün im Tab „Platz“ setzen");return}const svg=$("hvSvg"),pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
   const q=pt.matrixTransform(svg.getScreenCTM().inverse()),ll=hvFrame.back(q.x,q.y);
   target=target&&dist(target,ll)<px2m(30)?null:ll;update()});
 function px2m(p){const svg=$("hvSvg"),vb=svg.viewBox.baseVal,b=svg.getBoundingClientRect();return vb&&b.width?p*vb.width/b.width:20}
