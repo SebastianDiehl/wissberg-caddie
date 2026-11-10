@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14231a">
+<title>Wißberg Caddie</title>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map" role="application" aria-label="Satellitenkarte des Platzes"></div>
+    <div id="holeView" hidden>
+      <svg id="hvSvg" role="img" aria-label="Grafik der aktuellen Bahn"></svg>
+      <div class="hvmsg" id="hvMsg" hidden></div>
+      <button class="hvreset" id="hvReset" hidden>Ganze Bahn</button>
+      <div class="hvnote" id="hvNote" hidden>Du bist gerade nicht auf dieser Bahn</div>
+    </div>
+  </div>
+
+  <div class="top">
+    <div class="holebar">
+      <button class="nav" id="prev" aria-label="Vorheriges Loch">‹</button>
+      <div class="holeinfo" id="holeinfo"><div class="n">Loch 1</div><div class="p">Par –</div></div>
+      <button class="nav" id="next" aria-label="Nächstes Loch">›</button>
+    </div>
+    <button class="iconbtn" id="recenter" aria-label="Ansicht wechseln">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/></svg><span id="viewLbl">Satellit</span>
+    </button>
+  </div>
+  <div class="status" id="status">Suche GPS …</div>
+  <div class="editbadge" id="editbadge" hidden>Bearbeiten</div>
+
+  <div class="sheet">
+    <div class="dist">
+      <div><div class="lab">Vorne</div><div class="v" id="dF">–</div></div>
+      <div><div class="lab">Mitte Grün</div><div class="v big" id="dC">–</div></div>
+      <div><div class="lab">Hinten</div><div class="v" id="dB">–</div></div>
+    </div>
+    <div class="target" id="sugg"></div>
+    <div class="chips" id="hazards"></div>
+    <div class="target" id="target">Tippe auf die Karte, um eine Layup-Distanz zu messen</div>
+    <div class="replay" id="replayBar" hidden>
+      <div class="rtop"><div><b id="replayTitle">Runde</b><span id="replaySub"></span></div><div class="rbtns"><button class="btn" id="replayEdit">Bearbeiten</button><button class="btn" id="replayClose">Beenden</button></div></div>
+      <div class="rshots" id="replayShots"></div>
+    </div>
+    <div class="actions" id="liveActions">
+      <button class="btn primary" id="btnShot">Schlag von hier</button>
+      <button class="btn" id="btnBall">Auf dem Grün</button>
+      <button class="btn" id="btnScore">Score</button>
+    </div>
+    <button class="provbtn" id="btnProv" hidden>Ball evtl. verloren? <b>Provisorischen Ball spielen</b></button>
+    <div class="provbar" id="provBar" hidden>
+      <div class="pt"><b>Provisorischer Ball im Spiel</b><span>+1 Strafschlag ist schon eingerechnet</span></div>
+      <div class="pb"><button class="btn" id="provFound">Ursprünglicher Ball gefunden</button><button class="btn primary" id="provKeep">Provisorischen weiterspielen</button></div>
+    </div>
+    <div class="lastshot" id="lastshot"></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="map">Karte</button>
+      <button role="tab" aria-selected="false" data-tab="round">Runde</button>
+      <button role="tab" aria-selected="false" data-tab="clubs">Schläger</button>
+      <button role="tab" aria-selected="false" data-tab="player">Spieler</button>
+      <button role="tab" aria-selected="false" data-tab="setup">Platz</button>
+    </nav>
+  </div>
+</div>
+
+<!-- Schläger-Auswahl -->
+<div class="overlay" id="ovClub" hidden>
+  <h2>Welcher Schläger?</h2>
+  <p class="sub" id="clubSub">Position wird gespeichert. Die Weite ergibt sich beim nächsten Schlag oder mit „Auf dem Grün“.</p>
+  <div class="grid-clubs" id="clubGrid"></div>
+  <div class="card" style="margin-top:14px">
+    <h3>Sonderfälle – vor der Schlägerwahl antippen</h3>
+    <div class="modes">
+      <button data-mode="rehit"><b>Neu schlagen (Aus/verloren)</b><span>Erster Ball sicher weg: +1 Strafschlag, nächster Schlag von hier.</span></button>
+      <button data-mode="drop"><b>Strafschlag mit Drop</b><span>Wasser oder unspielbar: +1 Strafschlag, weiter von der Drop-Stelle.</span></button>
+    </div>
+  </div>
+  <div class="ovclose"><button class="btn" data-close>Abbrechen</button></div>
+</div>
+
+<!-- Score -->
+<div class="overlay" id="ovScore" hidden>
+  <h2 id="scoreTitle">Loch 1</h2>
+  <p class="sub">Score = getrackte Schläge + weitere Schläge + Putts.</p>
+  <div class="card">
+    <div class="stepper"><span>Getrackte Schläge</span><div class="ctl"><output id="oTracked">0</output></div></div>
+    <div class="stepper"><span>Weitere Schläge<br><small style="color:var(--muted)">Strafe oder nicht getrackt</small></span><div class="ctl"><button data-step="pen" data-d="-1" aria-label="weniger">−</button><output id="oPen">0</output><button data-step="pen" data-d="1" aria-label="mehr">+</button></div></div>
+    <div class="stepper"><span>Putts</span><div class="ctl"><button data-step="putts" data-d="-1" aria-label="weniger">−</button><output id="oPutts">0</output><button data-step="putts" data-d="1" aria-label="mehr">+</button></div></div>
+    <div class="stepper"><span>Par dieses Lochs</span><div class="ctl"><button data-step="par" data-d="-1" aria-label="weniger">−</button><output id="oPar">4</output><button data-step="par" data-d="1" aria-label="mehr">+</button></div></div>
+    <div class="stepper" style="border-top:1px solid var(--line);margin-top:4px;padding-top:10px"><strong>Score</strong><div class="ctl"><output id="oStrokes" style="color:var(--accent)">0</output></div></div>
+  </div>
+  <div class="card"><h3>Schläge auf diesem Loch</h3><div id="shotList"></div></div>
+  <div class="row"><button class="btn" id="undoShot">Letzten Schlag löschen</button><button class="btn primary" id="scoreNext">Speichern &amp; nächstes Loch</button></div>
+  <div class="ovclose"><button class="btn" data-close>Fertig</button></div>
+</div>
+
+<!-- Putten -->
+<div class="overlay" id="ovPutt" hidden>
+  <h2 id="puttTitle">Auf dem Grün</h2>
+  <p class="sub" id="puttSub"></p>
+  <div class="puttgrid">
+    <button data-putts="1">1 Putt</button>
+    <button data-putts="2">2 Putts</button>
+    <button data-putts="3">3 Putts</button>
+    <button data-putts="4">4 Putts</button>
+    <button data-putts="0" class="wide">Eingelocht ohne Putt</button>
+  </div>
+  <p class="note">Die Position hier beendet die Messung deines letzten Schlags. Danach geht es zum nächsten Loch. Korrigieren kannst du alles unter „Score“.</p>
+  <div class="ovclose"><button class="btn" data-close>Abbrechen</button></div>
+</div>
+
+<!-- Anleitung -->
+<div class="overlay" id="ovHelp" hidden>
+  <h2>So funktioniert's</h2>
+  <p class="sub">Einmal vorbereiten, dann pro Schlag zwei Tipps.</p>
+  <div class="card help">
+    <h3>1 · Vor der ersten Runde</h3>
+    <ol>
+      <li><b>Spieler:</b> HCPI, Herren oder Damen, Abschlag A–F und dein Bag eintragen. Daraus rechnet die App Spielvorgabe und Stableford-Punkte.</li>
+      <li><b>Platz:</b> „Platzdaten laden“ holt Löcher, Grüns und Hindernisse.</li>
+      <li><b>Runde:</b> 18 Löcher, 1–9 oder 10–18 wählen.</li>
+      <li>Im Browser „Zum Home-Bildschirm“ hinzufügen und den Standortzugriff erlauben.</li>
+    </ol>
+  </div>
+  <div class="card help">
+    <h3>2 · Auf der Bahn</h3>
+    <ul>
+      <li>Unten stehen die Distanzen zu Grün vorne, Mitte und hinten. In der Grafik stehen die Distanzen direkt an Grün, Bunkern und Wasser.</li>
+      <li><b>Antippen</b> setzt einen Layup-Punkt mit Distanz dorthin und Restdistanz zur Fahne. Nochmal tippen entfernt ihn.</li>
+      <li><b>Ein Finger</b> verschiebt, <b>zwei Finger</b> zoomen. „Ganze Bahn“ oder Doppeltippen setzt die Ansicht zurück.</li>
+      <li>Oben rechts wechselst du zwischen Bahngrafik und Satellit, mit ‹ › zwischen den Löchern.</li>
+    </ul>
+  </div>
+  <div class="card help">
+    <h3>3 · Schläge tracken</h3>
+    <ol>
+      <li>Am Ball: <b>„Schlag von hier“</b>, dann den Schläger antippen.</li>
+      <li>Am nächsten Ball genauso. Die Weite des vorherigen Schlags wird dabei automatisch gemessen.</li>
+      <li>Auf dem Grün: <b>„Auf dem Grün“</b>, dann 1, 2, 3 oder 4 Putts. Die App rechnet den Score und springt zum nächsten Loch.</li>
+    </ol>
+  </div>
+  <div class="card help">
+    <h3>4 · Sonderfälle</h3>
+    <ul>
+      <li><b>Provisorischer Ball:</b> Direkt nach einem Schlag erscheint auf der Startseite „Provisorischen Ball spielen“. Der Strafschlag zählt sofort. Den provisorischen Ball trackst du normal weiter, bis du „Ursprünglicher Ball gefunden“ (Strafe fällt weg) oder „Provisorischen weiterspielen“ tippst. „Auf dem Grün“ wertet ihn automatisch.</li>
+    </ul>
+    <p class="note">Bei „Schlag von hier“ <b>vor</b> der Schlägerwahl antippen:</p>
+    <ul>
+      <li><b>Neu schlagen:</b> Ball sicher im Aus oder verloren. +1 Strafschlag, weiter vom selben Ort.</li>
+      <li><b>Strafschlag mit Drop:</b> Wasser oder unspielbar. +1 Strafschlag, weiter von der Drop-Stelle.</li>
+    </ul>
+  </div>
+  <div class="card help">
+    <h3>5 · Korrigieren und auswerten</h3>
+    <ul>
+      <li><b>Score:</b> Schläger nachträglich ändern, Fehlschläge auf „Zählt nicht“ setzen, weitere Schläge, Putts und Par anpassen.</li>
+      <li><b>Runde:</b> Scorekarte mit Stableford-Punkten. Die Punkte unter dem Par zeigen deine Vorgabeschläge. Ein Loch antippen, um den Score direkt zu überschreiben (Markierung „korr.“). „Runde abschließen“ speichert die Runde in der Historie.</li>
+      <li><b>Gespeicherte Runden:</b> Antippen öffnet die Scorekarte. Dort korrigierst du Löcher, siehst die Runde in der Karte an oder löschst sie.</li>
+      <li><b>Schläger:</b> Durchschnitt, Maximum und typische Spanne pro Schläger. Daraus kommt auch die Schlägerempfehlung zur Fahne.</li>
+    </ul>
+  </div>
+  <div class="card help">
+    <h3>6 · Platz ergänzen und sichern</h3>
+    <ul>
+      <li>Fehlt etwas auf einem Loch: Im Tab „Platz“ ein Werkzeug wählen (z. B. „Grün Mitte“, „Bunker“, „Knick“) und in der Satellitenansicht tippen. Danach „Aus“ wählen oder auf das rote Feld tippen.</li>
+      <li>Alles liegt nur auf diesem Handy. „Als Datei sichern“ im Tab „Platz“ speichert Runden, Einstellungen und Platzdaten, z. B. in iCloud Drive. „Aus Datei laden“ stellt sie wieder her. Nach jeder abgeschlossenen Runde bietet die App die Sicherung an.</li>
+    </ul>
+  </div>
+  <div class="ovclose"><button class="btn primary" data-close>Los geht's</button></div>
+</div>
+
+<!-- Runde -->
+<div class="overlay" id="ovRound" hidden>
+  <h2>Aktuelle Runde</h2>
+  <p class="sub" id="roundSub"></p>
+  <div class="seg" id="modeSel" role="radiogroup" aria-label="Rundenlänge">
+    <button data-rmode="18" role="radio">18 Löcher</button><button data-rmode="f9" role="radio">1–9</button><button data-rmode="b9" role="radio">10–18</button>
+  </div>
+  <div class="card tw"><table id="roundTable"></table></div>
+  <div class="bkhint" id="bkHint" hidden><span id="bkHintTxt"></span><button class="btn" id="bkHintBtn">Jetzt sichern</button></div>
+  <div class="card"><h3>Gespeicherte Runden</h3><div class="tw"><table id="historyTable"></table></div></div>
+  <div class="row"><button class="btn" id="newRound">Runde abschließen &amp; neue starten</button></div>
+  <div class="ovclose"><button class="btn" data-close>Zur Karte</button></div>
+</div>
+
+<!-- Loch bearbeiten -->
+<div class="overlay" id="ovEdit" hidden>
+  <h2 id="editTitle">Loch 1</h2>
+  <p class="sub" id="editSub"></p>
+  <div class="card">
+    <div class="stepper"><span>Score</span><div class="ctl"><button data-es="strokes" data-d="-1" aria-label="weniger">−</button><output id="eStrokes">0</output><button data-es="strokes" data-d="1" aria-label="mehr">+</button></div></div>
+    <div class="stepper"><span>davon Putts</span><div class="ctl"><button data-es="putts" data-d="-1" aria-label="weniger">−</button><output id="ePutts">0</output><button data-es="putts" data-d="1" aria-label="mehr">+</button></div></div>
+    <div class="etrack" id="eTrack"></div>
+  </div>
+  <div class="row"><button class="btn" id="eReset">Aus Tracking berechnen</button><button class="btn" id="eClear">Loch leeren</button></div>
+  <div class="ovclose"><div class="row"><button class="btn" id="eCancel">Abbrechen</button><button class="btn primary" id="eSave">Speichern</button></div></div>
+</div>
+
+<!-- Gespeicherte Runde -->
+<div class="overlay" id="ovHist" hidden>
+  <h2 id="histTitle">Runde</h2>
+  <p class="sub" id="histSub"></p>
+  <button class="btn primary" id="histView" style="width:100%;margin-bottom:12px">In der Karte ansehen</button>
+  <div class="card tw"><table id="histTable"></table></div>
+  <p class="note">Tippe auf ein Loch, um den Score zu korrigieren.</p>
+  <button class="btn danger" id="histDel" style="width:100%;margin-top:8px">Runde löschen</button>
+  <div class="ovclose"><button class="btn" id="histBack">Zurück</button></div>
+</div>
+
+<!-- Sicherung nach Rundenabschluss -->
+<div class="overlay" id="ovBackup" hidden>
+  <h2>Runde gespeichert</h2>
+  <p class="sub" id="bkSub">Deine Daten liegen nur auf diesem Handy. Sichere sie jetzt als Datei, dann sind sie auch nach einem Handywechsel oder gelöschten Browserdaten noch da.</p>
+  <button class="btn primary" id="bkNow" style="width:100%">Jetzt als Datei sichern</button>
+  <div class="ovclose"><button class="btn" id="bkLater">Später</button></div>
+</div>
+
+<!-- Schläger-Statistik -->
+<div class="overlay" id="ovClubs" hidden>
+  <h2>Deine Schlägerweiten</h2>
+  <p class="sub">Balken = Durchschnitt, Strich = längster Schlag. Aus allen Runden, Schläge unter 15 m und Putts ausgenommen.</p>
+  <div class="card" id="clubStats"></div>
+  <p class="note">Welche Schläger du dabei hast, stellst du im Tab „Spieler“ ein.</p>
+  <div class="ovclose"><button class="btn" data-close>Zur Karte</button></div>
+</div>
+
+<!-- Spieler -->
+<div class="overlay" id="ovPlayer" hidden>
+  <h2>Spieler</h2>
+  <p class="sub">Gilt für die laufende und alle neuen Runden. Gespeicherte Runden behalten ihre Werte.</p>
+  <div class="card">
+    <h3>Handicap</h3>
+    <div class="hcprow">
+      <label for="hcpiIn">Handicap-Index (HCPI)</label>
+      <input id="hcpiIn" type="text" inputmode="decimal" placeholder="z. B. 18,4" autocomplete="off">
+    </div>
+    <div class="seg two" id="sexSel" role="radiogroup" aria-label="Wertung">
+      <button data-sex="m" role="radio">Herren</button><button data-sex="w" role="radio">Damen</button>
+    </div>
+    <div class="phcp" id="phcp"></div>
+  </div>
+  <div class="card">
+    <h3>Dein Abschlag</h3>
+    <div class="tools tees" id="teeSel"><button data-tee="a">A</button><button data-tee="b">B</button><button data-tee="c">C</button><button data-tee="d">D</button><button data-tee="e">E</button><button data-tee="f">F</button></div>
+    <div class="teeinfo" id="teeInfo"></div>
+    <p class="note">A ist der hinterste, F der vorderste Abschlag. Course Rating und Slope bestimmen deine Spielvorgabe. Alle Distanzen misst die App ab deinem Standort.</p>
+  </div>
+  <div class="card">
+    <h3 id="bagCount">Dein Bag</h3>
+    <div id="bagEdit"></div>
+    <p class="note">Nur ausgewählte Schläger erscheinen bei „Schlag von hier“. H = Holz, Hy = Hybrid. Erlaubt sind maximal 14 Schläger inklusive Putter.</p>
+  </div>
+  <div class="ovclose"><button class="btn" data-close>Zur Karte</button></div>
+</div>
+
+<!-- Platz-Setup -->
+<div class="overlay" id="ovSetup" hidden>
+  <h2>Platzdaten</h2>
+  <button class="btn" id="openHelp" style="width:100%;margin:4px 0 12px">Anleitung öffnen</button>
+  <p class="sub" id="setupSub"></p>
+  <div class="card">
+    <h3>Aus OpenStreetMap laden</h3>
+    <p class="note">Lädt Löcher, Grüns, Bunker und Wasser des Golfclub Rheinhessen (Hofgut Wißberg) aus OpenStreetMap. Fehlt etwas, ergänzt du es unten selbst.</p>
+    <button class="btn primary" id="loadOsm" style="width:100%">Platzdaten laden</button>
+    <pre id="osmLog" hidden style="white-space:pre-wrap;font:12px ui-monospace,monospace;color:var(--muted);margin:8px 0 0"></pre>
+    <p class="note">Klappt es nicht: <a id="osmLink" href="#" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Abfrage direkt im Browser öffnen</a>, den angezeigten Text komplett kopieren und unten bei „Sichern“ einfügen, dann „Daten einfügen“. Am bequemsten am Rechner, danach per Export aufs Handy.</p>
+  </div>
+  <div class="card">
+    <h3>Selbst einzeichnen</h3>
+    <p class="note">Werkzeug wählen, „Zur Karte“, dann auf der Karte tippen. Gilt für das aktuelle Loch. Am besten einmal vorab am Rechner oder bei einer Proberunde.</p>
+    <div class="tools" id="tools">
+      <button data-tool="green">Grün Mitte</button>
+      <button data-tool="greenF">Grün vorne</button>
+      <button data-tool="greenB">Grün hinten</button>
+      <button data-tool="tee">Abschlag</button>
+      <button data-tool="dog">Knick (Dogleg)</button>
+      <button data-tool="bunker">Bunker</button>
+      <button data-tool="water">Wasser</button>
+      <button data-tool="erase">Löschen</button>
+      <button data-tool="pos">Meine Position</button>
+      <button data-tool="">Aus</button>
+    </div>
+    <p class="note">„Meine Position“ setzt deinen Standort per Tipp (zum Testen zu Hause oder bei schlechtem GPS).</p>
+  </div>
+  <div class="card">
+    <h3>Sichern</h3>
+    <p class="note" id="bkInfo"></p>
+    <div class="row"><button class="btn primary" id="fileSave">Als Datei sichern</button><button class="btn" id="fileLoadBtn">Aus Datei laden</button></div>
+    <input type="file" id="fileLoad" accept=".json,application/json,text/plain" hidden>
+    <p class="note">Auf dem iPhone öffnet „Als Datei sichern“ das Teilen-Menü. Dort „In Dateien sichern“ wählen, z. B. in iCloud Drive.</p>
+    <div class="row" style="margin-top:6px"><button class="btn" id="exportBtn">Daten kopieren</button><button class="btn" id="importBtn">Daten einfügen</button></div>
+    <textarea id="ioText" rows="4" style="width:100%;margin-top:8px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:8px;font:12px ui-monospace,monospace" placeholder="Hier erscheint dein Export bzw. hier Daten einfügen"></textarea>
+    <p class="note">Alles liegt nur in diesem Browser. Exportiere ab und zu, um Runden und Platzdaten zu sichern oder aufs nächste Handy mitzunehmen.</p>
+  </div>
+  <div class="ovclose"><button class="btn" data-close>Zur Karte</button></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="data/rheinhessen.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
