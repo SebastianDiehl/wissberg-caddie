@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Wißberg Caddie app icon: flag on a green -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b8a4a"/>
+      <stop offset="1" stop-color="#1a6a36"/>
+    </linearGradient>
+    <pattern id="stripe" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+      <rect width="40" height="40" fill="#8fd968"/>
+      <rect width="20" height="40" fill="#a4e57e"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="372" rx="196" ry="92" fill="#14231a" opacity=".25"/>
+  <ellipse cx="256" cy="360" rx="190" ry="88" fill="url(#stripe)" stroke="#3f8f34" stroke-width="8"/>
+  <ellipse cx="282" cy="378" rx="30" ry="13" fill="#14231a"/>
+  <rect x="274" y="96" width="16" height="284" rx="8" fill="#ffffff"/>
+  <path d="M290 100 L414 146 L290 194 Z" fill="#e0302a" stroke="#b5221d" stroke-width="6" stroke-linejoin="round"/>
+</svg>

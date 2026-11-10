@@ -4,6 +4,7 @@
 
 - Tournament mode in the player tab: hides the club recommendation (not allowed in competition under Rule 4.3); a "Turnier" badge shows in the header
 - "Unofficial, distances without warranty" notice in the guide and the course tab
+- App icon (flag on a green) as favicon, bookmark and home-screen icon; web app manifest
 
 ## 2026-11-10 — Repository setup
 
