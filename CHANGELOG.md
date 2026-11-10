@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Multiple courses: course picker in the course tab, Mainzer Golfclub (Budenheim, 18 holes) added with par, stroke index and ratings for white, yellow, blue, red and green tees. Hole data, running round and tee are kept per course; history is tagged by course; backups include all courses.
+
 ## 2026-11-10 — Repository setup
 
 - Split the single-file app into `index.html`, `style.css`, `app.js`, `data/rheinhessen.js` and `vendor/`.

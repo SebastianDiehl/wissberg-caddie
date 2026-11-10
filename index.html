@@ -249,9 +249,9 @@
   </div>
   <div class="card">
     <h3>Dein Abschlag</h3>
-    <div class="tools tees" id="teeSel"><button data-tee="a">A</button><button data-tee="b">B</button><button data-tee="c">C</button><button data-tee="d">D</button><button data-tee="e">E</button><button data-tee="f">F</button></div>
+    <div class="tools tees" id="teeSel"></div>
     <div class="teeinfo" id="teeInfo"></div>
-    <p class="note">A ist der hinterste, F der vorderste Abschlag. Course Rating und Slope bestimmen deine Spielvorgabe. Alle Distanzen misst die App ab deinem Standort.</p>
+    <p class="note" id="teeNote">Course Rating und Slope bestimmen deine Spielvorgabe. Alle Distanzen misst die App ab deinem Standort.</p>
   </div>
   <div class="card">
     <h3 id="bagCount">Dein Bag</h3>
@@ -265,10 +265,15 @@
 <div class="overlay" id="ovSetup" hidden>
   <h2>Platzdaten</h2>
   <button class="btn" id="openHelp" style="width:100%;margin:4px 0 12px">Anleitung öffnen</button>
+  <div class="card">
+    <h3>Golfplatz</h3>
+    <div class="courses" id="courseSel" role="radiogroup" aria-label="Golfplatz"></div>
+    <p class="note">Runden, Platzdaten und Einstellungen zum Abschlag gelten je Platz. Bag, HCPI und Schlägerweiten gelten überall. Beim Wechsel lädt die App neu.</p>
+  </div>
   <p class="sub" id="setupSub"></p>
   <div class="card">
     <h3>Aus OpenStreetMap laden</h3>
-    <p class="note">Lädt Löcher, Grüns, Bunker und Wasser des Golfclub Rheinhessen (Hofgut Wißberg) aus OpenStreetMap. Fehlt etwas, ergänzt du es unten selbst.</p>
+    <p class="note">Lädt Löcher, Grüns, Bunker und Wasser des <span id="osmCourse">Golfplatzes</span> aus OpenStreetMap. Fehlt etwas, ergänzt du es unten selbst.</p>
     <button class="btn primary" id="loadOsm" style="width:100%">Platzdaten laden</button>
     <pre id="osmLog" hidden style="white-space:pre-wrap;font:12px ui-monospace,monospace;color:var(--muted);margin:8px 0 0"></pre>
     <p class="note">Klappt es nicht: <a id="osmLink" href="#" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Abfrage direkt im Browser öffnen</a>, den angezeigten Text komplett kopieren und unten bei „Sichern“ einfügen, dann „Daten einfügen“. Am bequemsten am Rechner, danach per Export aufs Handy.</p>
@@ -307,6 +312,7 @@
 
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="data/rheinhessen.js"></script>
+<script src="data/mainz.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
