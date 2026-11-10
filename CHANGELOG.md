@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Optional Esri API key in `config.js` for the satellite view (keyed basemap endpoint)
+
 ## 2026-11-10 — Repository setup
 
 - Split the single-file app into `index.html`, `style.css`, `app.js`, `data/rheinhessen.js` and `vendor/`.

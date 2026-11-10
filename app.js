@@ -57,7 +57,9 @@ const m=v=>v==null||!isFinite(v)?"–":Math.round(v);
 
 // ---------- Karte ----------
 const map=L.map("map",{zoomControl:false,attributionControl:true,tap:true}).setView(COURSE_GUESS,15);
-const satTiles=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:19,attribution:"Esri, Maxar · Daten © OpenStreetMap"});
+// Satellite tiles: with an Esri API key (config.js) the keyed basemap endpoint is used
+const ESRI_KEY=((window.APP_CONFIG||{}).esriKey||"").trim();
+const satTiles=L.tileLayer(ESRI_KEY?"https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token="+encodeURIComponent(ESRI_KEY):"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:19,attribution:"Esri, Maxar, Earthstar Geographics · Daten © OpenStreetMap"});
 const layers={course:L.layerGroup().addTo(map),hole:L.layerGroup().addTo(map),shots:L.layerGroup().addTo(map),meas:L.layerGroup().addTo(map)};
 const icon=c=>L.divIcon({className:"",html:`<div class="${c}"></div>`,iconSize:[22,22],iconAnchor:[11,11]});
 let meMarker=null,accCircle=null,me=null,meAcc=null,manualPos=false,target=null,tool="";
