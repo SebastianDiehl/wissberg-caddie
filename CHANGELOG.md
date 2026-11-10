@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Hole view drawn from the tee signs for holes 2, 4–6 and 9–18: outline, trees, bunkers, water and doglegs; shown even before tee and green are set (distances from the tee). Once tee and green are set, the layout is placed on the real hole and its bunkers and water count for distances, unless own markings or OpenStreetMap data exist.
+
 ## 2026-11-10 — Repository setup
 
 - Split the single-file app into `index.html`, `style.css`, `app.js`, `data/rheinhessen.js` and `vendor/`.
