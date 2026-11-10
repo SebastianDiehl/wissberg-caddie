@@ -17,6 +17,11 @@ window.COURSE_DATA = {
   name: "Golfclub Rheinhessen",
   center: [49.840, 7.975],
   par: 72,
+  place: "Hofgut Wißberg",
+  search: ["Golfclub Rheinhessen Hofgut Wißberg", "Golfclub Rheinhessen", "Hofgut Wißberg Golf"],
+  match: "rheinhessen|wi(ß|ss)berg",
+  tees: { a: "A", b: "B", c: "C", d: "D", e: "E", f: "F" },
+  defaultTee: "b",
   holes: {
     1:{par:4,hcp:7},
     2:{par:5,hcp:11,depth:37,

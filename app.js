@@ -1,20 +1,30 @@
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
-const COURSE_GUESS=window.COURSE_DATA.center;
+// ---------- Platz ----------
+const COURSES=Object.assign({rheinhessen:window.COURSE_DATA},window.COURSES||{});
+const COURSE_ID=(()=>{try{const c=JSON.parse(localStorage.getItem("wb_ui_v1")||"{}").course;return COURSES[c]?c:"rheinhessen"}catch(e){return"rheinhessen"}})();
+const COURSE=COURSES[COURSE_ID];
+const COURSE_GUESS=COURSE.center;
 // Alle wählbaren Schläger; H = Holz. Ältere Kürzel bleiben für die Statistik bekannt.
 const CLUB_GROUPS=[["Hölzer",["Dr","H3","H5","H7","H9"]],["Hybride",["Hy4","Hy5"]],["Eisen",["3i","4i","5i","6i","7i","8i","9i","PW"]],["Wedges",["46°","48°","50°","52°","54°","56°","58°","60°","62°","64°"]]];
 const ALL_CLUBS=CLUB_GROUPS.flatMap(g=>g[1]).concat(["3H","5H","Hy","GW","SW","LW"]);
 const DEFAULT_BAG=["Dr","H3","H5","5i","6i","7i","8i","9i","PW","52°","56°","60°"];
 function bag(){const b=(typeof ui!=="undefined"&&ui&&Array.isArray(ui.bag)&&ui.bag.length)?ui.bag:DEFAULT_BAG;return ALL_CLUBS.filter(c=>b.includes(c))}
 let CLUBS=DEFAULT_BAG;
-// Course data comes from data/rheinhessen.js (window.COURSE_DATA)
-const SCORECARD=window.COURSE_DATA.holes;
-const RATINGS=window.COURSE_DATA.ratings;
-const COURSE_PAR=window.COURSE_DATA.par;
-function teeKey(){const t=(typeof ui!=="undefined"&&ui&&ui.tee)||"b";return RATINGS[t]?t:({w:"a",y:"b",r:"d",g:"e"}[t]||"b")}
+// Course data comes from data/<course>.js
+const SCORECARD=COURSE.holes;
+const RATINGS=COURSE.ratings;
+const COURSE_PAR=COURSE.par;
+const TEE_LABELS=COURSE.tees||Object.fromEntries(Object.keys(RATINGS).map(k=>[k,k.toUpperCase()]));
+// Tee per course (ui.tees[courseId]); older versions stored one ui.tee for Rheinhessen
+function teeKey(){const u=(typeof ui!=="undefined"&&ui)||{},t=(u.tees&&u.tees[COURSE_ID])||(COURSE_ID==="rheinhessen"?u.tee:null)||COURSE.defaultTee||Object.keys(RATINGS)[0];
+  return RATINGS[t]?t:(COURSE_ID==="rheinhessen"&&{w:"a",y:"b",r:"d",g:"e"}[t])||COURSE.defaultTee||Object.keys(RATINGS)[0]}
+function setTee(t){ui.tees=ui.tees||{};ui.tees[COURSE_ID]=t;if(COURSE_ID==="rheinhessen")ui.tee=t}
 function applyCard(){for(const[n,v]of Object.entries(SCORECARD)){const h=course.holes[n]=course.holes[n]||{};if(!h.parSet)h.par=v.par;h.hcp=v.hcp;if(v.depth)h.depth=v.depth;delete h.len}}
-const K={course:"wb_course_v1",round:"wb_round_v1",hist:"wb_hist_v1",ui:"wb_ui_v1"};
+// Rheinhessen keeps the original keys so existing data stays where it is
+const SFX=COURSE_ID==="rheinhessen"?"":"_"+COURSE_ID;
+const K={course:"wb_course_v1"+SFX,round:"wb_round_v1"+SFX,hist:"wb_hist_v1",ui:"wb_ui_v1"};
 
 // ---------- Storage ----------
 const load=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
@@ -23,9 +33,9 @@ let course=load(K.course,{holes:{},hazards:[],bbox:null,src:null});
 let ui=load(K.ui,{hole:1});
 let round=load(K.round,null)||newRoundObj();
 let hist=load(K.hist,[]);
-if(ui.tee&&!RATINGS[ui.tee])ui.tee=teeKey();
+if(COURSE_ID==="rheinhessen"&&ui.tee&&!RATINGS[ui.tee])ui.tee=teeKey();
 applyCard();
-function newRoundObj(mode){const u=ui||{};return{start:Date.now(),holes:{},mode:mode||"18",tee:u.tee,hcpi:u.hcpi,sex:u.sex}}
+function newRoundObj(mode){const u=ui||{};return{start:Date.now(),holes:{},mode:mode||"18",tee:teeKey(),hcpi:u.hcpi,sex:u.sex}}
 const MODES={"18":[1,18,"18 Löcher"],"f9":[1,9,"Löcher 1–9"],"b9":[10,18,"Löcher 10–18"]};
 let viewRound=null; // vergangene Runde im Ansichtsmodus
 function cur(){return viewRound||round}
@@ -33,8 +43,8 @@ function range(){return MODES[cur().mode||"18"]}
 function H(n){course.holes[n]=course.holes[n]||{};return course.holes[n]}
 // ---------- Stableford (WHS) ----------
 // Spieleinstellungen einer Runde: beim Start eingefroren, sonst aktuelle Einstellungen
-function playSet(r){r=r||cur();const t=r.tee||teeKey(),hc=(r.hcpi!=null?r.hcpi:ui.hcpi),sx=r.sex||ui.sex||"m";return{tee:RATINGS[t]?t:"b",hcpi:(hc===""||hc==null||isNaN(hc))?null:+hc,sex:sx}}
-function courseHcp(r){const p=playSet(r);if(p.hcpi==null)return null;const[cr,sr]=RATINGS[p.tee][p.sex],nine=MODES[(r||cur()).mode||"18"][1]-MODES[(r||cur()).mode||"18"][0]<9;
+function playSet(r){r=r||cur();const t=(r.tee&&RATINGS[r.tee])?r.tee:teeKey(),hc=(r.hcpi!=null?r.hcpi:ui.hcpi),sx=r.sex||ui.sex||"m";return{tee:t,hcpi:(hc===""||hc==null||isNaN(hc))?null:+hc,sex:sx}}
+function courseHcp(r){const p=playSet(r);if(p.hcpi==null)return null;const rt=RATINGS[p.tee][p.sex];if(!rt)return null;const[cr,sr]=rt,nine=MODES[(r||cur()).mode||"18"][1]-MODES[(r||cur()).mode||"18"][0]<9;
   return nine?Math.round(p.hcpi/2*sr/113+cr/2-COURSE_PAR/2):Math.round(p.hcpi*sr/113+cr-COURSE_PAR)}
 function strokesRecv(n,r){r=r||cur();const ch=courseHcp(r);if(ch==null)return null;const[a,b]=MODES[r.mode||"18"],k=b-a+1;
   const idx=[];for(let i=a;i<=b;i++)idx.push([i,(SCORECARD[i]||{}).hcp||i]);idx.sort((x,y)=>x[1]-y[1]);const rank=idx.findIndex(x=>x[0]==n)+1;if(!rank)return 0;
@@ -512,8 +522,9 @@ function renderRound(){
   document.querySelectorAll("[data-rmode]").forEach(b=>{const on=b.dataset.rmode===(round.mode||"18");b.classList.toggle("sel",on);b.setAttribute("aria-checked",on)});
   const d=new Date(round.start);$("roundSub").textContent="Gestartet "+d.toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})+", "+d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+" · "+setInfo(round);
   $("roundTable").innerHTML=cardHTML(round);
-  const anySF=hist.some(h=>courseHcp(h)!=null);
-  $("historyTable").innerHTML=hist.length?`<tr><th class='l'>Datum</th><th>Löcher</th><th>Schläge</th><th>+/−</th>${anySF?"<th>Pkt</th>":""}<th>Putts</th></tr>`+hist.map((h,i)=>[h,i]).reverse().map(([h,i])=>{const sf=sfTotal(h);return`<tr class="hrow" data-hist="${i}" tabindex="0"><td class="l">${new Date(h.start).toLocaleDateString("de-DE")} <span class="go">Öffnen ›</span></td><td>${h.mode&&h.mode!=="18"?MODES[h.mode][2]:h.played}</td><td>${h.strokes}</td><td>${h.vsPar>0?"+":""}${h.vsPar}</td>${anySF?`<td>${sf==null?"–":sf}</td>`:""}<td>${h.putts}</td></tr>`}).join(""):"<tr><td class='l' style='color:var(--muted)'>Noch keine abgeschlossene Runde</td></tr>";
+  const mine=hist.map((h,i)=>[h,i]).filter(([h])=>(h.course||"rheinhessen")===COURSE_ID),other=hist.length-mine.length;
+  const anySF=mine.some(([h])=>courseHcp(h)!=null);
+  $("historyTable").innerHTML=(mine.length?`<tr><th class='l'>Datum</th><th>Löcher</th><th>Schläge</th><th>+/−</th>${anySF?"<th>Pkt</th>":""}<th>Putts</th></tr>`+mine.reverse().map(([h,i])=>{const sf=sfTotal(h);return`<tr class="hrow" data-hist="${i}" tabindex="0"><td class="l">${new Date(h.start).toLocaleDateString("de-DE")} <span class="go">Öffnen ›</span></td><td>${h.mode&&h.mode!=="18"?MODES[h.mode][2]:h.played}</td><td>${h.strokes}</td><td>${h.vsPar>0?"+":""}${h.vsPar}</td>${anySF?`<td>${sf==null?"–":sf}</td>`:""}<td>${h.putts}</td></tr>`}).join(""):"<tr><td class='l' style='color:var(--muted)'>Noch keine abgeschlossene Runde auf diesem Platz</td></tr>")+(other?`<tr><td class='l' colspan='6' style='color:var(--muted)'>${other} weitere Runde${other===1?"":"n"} auf anderen Plätzen</td></tr>`:"");
   renderBackupHint();
 }
 // ---------- Rundendetail ----------
@@ -577,7 +588,7 @@ let confirmNew=0;
 $("newRound").onclick=()=>{if(viewRound)viewRound=null;if(Date.now()-confirmNew>4000){confirmNew=Date.now();$("newRound").textContent="Nochmal tippen zum Bestätigen";return}
   let s=0,p=0,pu=0,pl=0;for(const[i,r]of Object.entries(round.holes)){if(r.strokes){s+=r.strokes;pu+=r.putts||0;p+=(course.holes[i]||{}).par||0;pl++}}
   const hasShots=Object.values(round.holes).some(r=>r.shots.length);
-  if(pl||hasShots){const ps=playSet(round);const e={start:round.start,mode:round.mode||"18",tee:ps.tee,hcpi:ps.hcpi,sex:ps.sex,played:pl,strokes:s,vsPar:s-p,putts:pu,holes:round.holes};e.sf=sfTotal(e);hist.push(e)}
+  if(pl||hasShots){const ps=playSet(round);const e={start:round.start,course:COURSE_ID,mode:round.mode||"18",tee:ps.tee,hcpi:ps.hcpi,sex:ps.sex,played:pl,strokes:s,vsPar:s-p,putts:pu,holes:round.holes};e.sf=sfTotal(e);hist.push(e)}
   save(K.hist,hist);round=newRoundObj(round.mode);save(K.round,round);$("newRound").textContent="Runde abschließen & neue starten";
   goHole(range()[0]);renderRound();
   if(hist.length){$("bkSub").textContent=bkText()+" Deine Daten liegen nur auf diesem Handy. Sichere sie jetzt als Datei, dann sind sie auch nach einem Handywechsel oder gelöschten Browserdaten noch da.";openOv("ovBackup")}else toast("Neue Runde gestartet")};
@@ -606,12 +617,16 @@ function syncRoundSettings(){if(viewRound)return;round.tee=teeKey();round.hcpi=u
 function renderPlayer(){
   const inp=$("hcpiIn");if(document.activeElement!==inp)inp.value=ui.hcpi!=null?String(ui.hcpi).replace(".",","):"";
   document.querySelectorAll("[data-sex]").forEach(b=>{const on=b.dataset.sex===(ui.sex||"m");b.classList.toggle("sel",on);b.setAttribute("aria-checked",on)});
+  $("teeSel").style.gridTemplateColumns=`repeat(${Math.min(6,Object.keys(RATINGS).length)},1fr)`;
+  if(!$("teeSel").children.length){$("teeSel").innerHTML=Object.keys(RATINGS).map(k=>`<button data-tee="${k}">${TEE_LABELS[k]||k.toUpperCase()}</button>`).join("");
+    $("teeSel").querySelectorAll("[data-tee]").forEach(b=>b.onclick=()=>{setTee(b.dataset.tee);save(K.ui,ui);syncRoundSettings();renderPlayer();update()})}
   document.querySelectorAll("[data-tee]").forEach(b=>b.classList.toggle("sel",b.dataset.tee===teeKey()));
-  const t=teeKey(),R0=RATINGS[t],sx=ui.sex||"m",[cr,sr]=R0[sx];
-  $("teeInfo").innerHTML=`<span><b>${t.toUpperCase()}</b></span><span>CR <b>${cr.toFixed(1).replace(".",",")}</b></span><span>Slope <b>${sr}</b></span><span>Par <b>${COURSE_PAR}</b></span><span>ca. <b>${R0.len.toLocaleString("de-DE")}</b> m</span>`;
+  const t=teeKey(),R0=RATINGS[t],sx=ui.sex||"m",rt=R0[sx];
+  $("teeNote").textContent=(COURSE_ID==="rheinhessen"?"A ist der hinterste, F der vorderste Abschlag. ":"")+"Course Rating und Slope bestimmen deine Spielvorgabe. Alle Distanzen misst die App ab deinem Standort.";
+  $("teeInfo").innerHTML=`<span><b>${TEE_LABELS[t]||t.toUpperCase()}</b></span>`+(rt?`<span>CR <b>${rt[0].toFixed(1).replace(".",",")}</b></span><span>Slope <b>${rt[1]}</b></span>`:`<span>Kein ${sx==="w"?"Damen":"Herren"}-Rating für diesen Abschlag</span>`)+`<span>Par <b>${COURSE_PAR}</b></span><span>ca. <b>${R0.len.toLocaleString("de-DE")}</b> m</span>`;
   const r18={mode:"18",tee:t,hcpi:ui.hcpi,sex:sx,holes:{}},r9={mode:"f9",tee:t,hcpi:ui.hcpi,sex:sx,holes:{}};
   const c18=courseHcp(r18),c9=courseHcp(r9);
-  $("phcp").innerHTML=c18==null?'<span class="muted">HCPI eintragen, dann rechnet die App Spielvorgabe und Stableford-Punkte.</span>':`<div><span>Spielvorgabe 18 Löcher</span><b>${c18}</b></div><div><span>Spielvorgabe 9 Löcher</span><b>${c9}</b></div>`;
+  $("phcp").innerHTML=c18==null?(ui.hcpi!=null&&!rt?'<span class="muted">Für diesen Abschlag gibt es kein Rating in deiner Wertung, daher keine Spielvorgabe und keine Stableford-Punkte.</span>':'<span class="muted">HCPI eintragen, dann rechnet die App Spielvorgabe und Stableford-Punkte.</span>'):`<div><span>Spielvorgabe 18 Löcher</span><b>${c18}</b></div><div><span>Spielvorgabe 9 Löcher</span><b>${c9}</b></div>`;
   $("tourneyIn").checked=!!ui.tourney;
   renderBag()}
 $("tourneyIn").addEventListener("change",()=>{ui.tourney=$("tourneyIn").checked;save(K.ui,ui);update();toast(ui.tourney?"Turniermodus an: keine Schlägerempfehlung":"Turniermodus aus")});
@@ -619,8 +634,10 @@ $("hcpiIn").addEventListener("input",()=>{const v=$("hcpiIn").value.trim().repla
   if(v===""){ui.hcpi=null}else{const x=parseFloat(v);if(isNaN(x)||x<-10||x>54){$("hcpiIn").classList.add("bad");return}ui.hcpi=Math.round(x*10)/10}
   $("hcpiIn").classList.remove("bad");save(K.ui,ui);syncRoundSettings();renderPlayer();update()});
 document.querySelectorAll("[data-sex]").forEach(b=>b.onclick=()=>{ui.sex=b.dataset.sex;save(K.ui,ui);syncRoundSettings();renderPlayer();update()});
-document.querySelectorAll("[data-tee]").forEach(b=>b.onclick=()=>{ui.tee=b.dataset.tee;save(K.ui,ui);syncRoundSettings();renderPlayer();update()});
-function renderSetup(){$("bkInfo").textContent=bkText();
+function renderCourses(){$("courseSel").innerHTML=Object.values(COURSES).map(c=>`<button data-course="${c.id}" role="radio" aria-checked="${c.id===COURSE_ID}" class="${c.id===COURSE_ID?"sel":""}"><b>${c.name}</b><span>${c.place||""} · ${Object.keys(c.holes).length} Löcher · Par ${c.par}</span></button>`).join("");
+  $("courseSel").querySelectorAll("[data-course]").forEach(b=>b.onclick=()=>{const id=b.dataset.course;if(id===COURSE_ID)return;
+    ui.course=id;save(K.ui,ui);toast(COURSES[id].name+" wird geladen …");setTimeout(()=>location.reload(),300)})}
+function renderSetup(){renderCourses();$("osmCourse").textContent=COURSE.name+(COURSE.place?` (${COURSE.place})`:"");$("bkInfo").textContent=bkText();
   const nh=Object.values(course.holes).filter(h=>h.greenC||h.greenPoly).length;
   $("setupSub").textContent=course.src?`Quelle: ${course.src} · ${nh} von 18 Grüns · ${course.hazards.length} Hindernisse`:"Noch keine Platzdaten geladen.";
   document.querySelectorAll("#tools button").forEach(b=>b.classList.toggle("sel",b.dataset.tool===tool&&tool!==""));
@@ -640,13 +657,13 @@ let osmBBox=[GLA-.015,GLO-.02,GLA+.015,GLO+.02]; // [S,W,N,E], wird per Nominati
 const mapUrl=b=>`https://api.openstreetmap.org/api/0.6/map?bbox=${b[1].toFixed(5)},${b[0].toFixed(5)},${b[3].toFixed(5)},${b[2].toFixed(5)}`;
 async function timedFetch(url,opt,ms){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms);try{return await fetch(url,{...opt,signal:ac.signal})}finally{clearTimeout(to)}}
 async function findCourse(log){
-  for(const q of["Golfclub Rheinhessen Hofgut Wißberg","Golfclub Rheinhessen","Hofgut Wißberg Golf"]){
+  for(const q of COURSE.search||[COURSE.name]){
     try{const r=await timedFetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=de&q="+encodeURIComponent(q),{},15000);
       if(!r.ok){log(`Suche: HTTP ${r.status}`);continue}
       const res=await r.json();const hit=res.find(x=>x.type==="golf_course")||res.find(x=>x.category==="leisure");
       if(hit){const b=hit.boundingbox.map(Number);osmBBox=[b[0]-.002,b[2]-.003,b[1]+.002,b[3]+.003];log(`Platz gefunden: ${hit.name||hit.display_name.split(",")[0]}`);return true}}
     catch(e){log("Suche: keine Antwort")}}
-  log("Platz nicht per Suche gefunden, nutze Umgebung St. Johann");return false}
+  log(`Platz nicht per Suche gefunden, nutze Umgebung ${COURSE.place||COURSE.name}`);return false}
 function xmlToElements(txt){
   const doc=new DOMParser().parseFromString(txt,"text/xml");if(doc.querySelector("parsererror"))throw new Error("Kein gültiges OSM-XML");
   const nodes={},ways={},out=[];const tags=el=>{const t={};el.querySelectorAll(":scope>tag").forEach(x=>t[x.getAttribute("k")]=x.getAttribute("v"));return t};
@@ -676,7 +693,7 @@ function applyOsm(d){
   const els=d.elements||[];
   const courses=els.filter(e=>e.tags&&e.tags.leisure==="golf_course").map(e=>({e,g:geom(e)})).filter(o=>o.g&&o.g.length>2);
   if(!courses.length)throw new Error("Kein Golfplatz in den OSM-Daten gefunden");
-  const pick=courses.find(o=>/(rheinhessen|wi(ß|ss)berg)/i.test(o.e.tags.name||""))||courses.sort((a,b)=>dist(COURSE_GUESS,centroid(a.g))-dist(COURSE_GUESS,centroid(b.g)))[0];
+  const pick=courses.find(o=>new RegExp(COURSE.match||COURSE.name,"i").test(o.e.tags.name||""))||courses.sort((a,b)=>dist(COURSE_GUESS,centroid(a.g))-dist(COURSE_GUESS,centroid(b.g)))[0];
   const lats=pick.g.map(p=>p[0]),lons=pick.g.map(p=>p[1]);
   const bb=[Math.min(...lats)-.002,Math.min(...lons)-.003,Math.max(...lats)+.002,Math.max(...lons)+.003];
   const inBB=p=>p[0]>=bb[0]&&p[0]<=bb[2]&&p[1]>=bb[1]&&p[1]<=bb[3];
@@ -708,7 +725,10 @@ $("loadOsm").onclick=async()=>{
 };
 
 // ---------- Export/Import ----------
-function exportObj(){return{app:"wissberg-caddie",version:2,saved:new Date().toISOString(),course,round,hist,ui}}
+// Backup holds every course: hole data and the running round per course, plus shared history and settings
+function exportObj(){const courses={};for(const id of Object.keys(COURSES)){const sx=id==="rheinhessen"?"":"_"+id;
+    courses[id]=id===COURSE_ID?{course,round}:{course:load("wb_course_v1"+sx,null),round:load("wb_round_v1"+sx,null)}}
+  return{app:"wissberg-caddie",version:3,saved:new Date().toISOString(),course,round,courseId:COURSE_ID,courses,hist,ui}}
 function daysAgo(t){return Math.floor((Date.now()-t)/864e5)}
 function bkText(){if(!ui.lastBackup)return hist.length?"Noch nie gesichert.":"Noch keine Sicherung.";const d=daysAgo(ui.lastBackup);return "Letzte Sicherung "+(d===0?"heute":d===1?"gestern":`vor ${d} Tagen`)+"."}
 function needsBackup(){const newest=Math.max(0,...hist.map(h=>h.start||0),round.start||0);return hist.length>0&&(!ui.lastBackup||ui.lastBackup<newest&&daysAgo(ui.lastBackup)>=0)}
@@ -721,8 +741,10 @@ async function saveFile(){const txt=JSON.stringify(exportObj()),name=`wissberg-c
   try{const url=URL.createObjectURL(new Blob([txt],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);done();toast("Datei "+name+" gespeichert");return true}
   catch(e){toast("Speichern als Datei klappt hier nicht. Nutze „Daten kopieren“.");return false}}
 function importData(o){if(o.elements){applyOsm(o);return}
-  if(!o.course&&!o.round&&!o.hist)throw new Error("leer");
-  if(o.course)course=o.course;if(o.round)round=o.round;if(o.hist)hist=o.hist;if(o.ui){const keep={hole:ui.hole,view:ui.view,seenHelp:true};ui=Object.assign({},o.ui,keep)}
+  if(!o.course&&!o.round&&!o.hist&&!o.courses)throw new Error("leer");
+  if(o.courses){for(const[id,v]of Object.entries(o.courses)){if(!COURSES[id]||id===COURSE_ID||!v)continue;const sx=id==="rheinhessen"?"":"_"+id;if(v.course)save("wb_course_v1"+sx,v.course);if(v.round)save("wb_round_v1"+sx,v.round)}
+    const mine=o.courses[COURSE_ID];if(mine){if(mine.course)course=mine.course;if(mine.round)round=mine.round}}
+  else{if(o.course)course=o.course;if(o.round)round=o.round}if(o.hist)hist=o.hist;if(o.ui){const keep={hole:ui.hole,view:ui.view,seenHelp:true,course:COURSE_ID};ui=Object.assign({},o.ui,keep)}
   viewRound=null;applyCard();save(K.course,course);save(K.round,round);save(K.hist,hist);save(K.ui,ui);buildClubGrid();drawCourse();drawHole();update();renderSetup();toast("Daten übernommen: "+hist.length+" Runden")}
 $("fileSave").onclick=saveFile;
 $("bkNow").onclick=async()=>{if(await saveFile())closeOv()};
