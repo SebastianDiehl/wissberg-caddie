@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- App icon (flag on a green) as favicon, bookmark and home-screen icon; web app manifest
+
 ## 2026-11-10 — Repository setup
 
 - Split the single-file app into `index.html`, `style.css`, `app.js`, `data/rheinhessen.js` and `vendor/`.

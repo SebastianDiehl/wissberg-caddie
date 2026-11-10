@@ -28,6 +28,7 @@ Plain static files, no build step and no backend.
 | `style.css` | App styles (theme tokens for light and dark) |
 | `app.js` | App logic |
 | `data/rheinhessen.js` | Course data: par, stroke index, green depth, course rating / slope per tee |
+| `icons/`, `favicon.ico`, `manifest.webmanifest` | App icon (source: `icons/icon.svg`) and home-screen metadata |
 | `vendor/` | Leaflet 1.9.4 and the fonts, self-hosted (no requests to Google or CDNs) |
 
 ### Data and privacy
