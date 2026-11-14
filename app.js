@@ -255,7 +255,12 @@ function renderHoleView(){
   }
   // Spieler
   if(onHole){hvEl("circle",{cx:meXY[0],cy:meXY[1],r:px(16),fill:"rgba(45,140,255,.25)"},layer);
-    hvEl("circle",{cx:meXY[0],cy:meXY[1],r:px(8),fill:"#2d8cff",stroke:"#fff","stroke-width":px(3)},layer)}
+    // Blickrichtung als Lichtkegel (wie bei Google Maps); Winkel setzt updateHeading()
+    const R1=px(72),hw=30*Math.PI/180,cg=hvEl("g",{id:"hvCone",transform:`translate(${meXY[0]} ${meXY[1]})`,visibility:"hidden"},layer);
+    const gd=hvEl("radialGradient",{id:"coneGrad",cx:"0",cy:"0",r:String(R1),gradientUnits:"userSpaceOnUse"},defs);
+    hvEl("stop",{offset:"0","stop-color":"#4aa3ff","stop-opacity":".9"},gd);hvEl("stop",{offset:".65","stop-color":"#4aa3ff","stop-opacity":".5"},gd);hvEl("stop",{offset:"1","stop-color":"#4aa3ff","stop-opacity":"0"},gd);
+    hvEl("path",{id:"hvConeShape",d:`M0 0 L${(-Math.sin(hw)*R1).toFixed(2)} ${(-Math.cos(hw)*R1).toFixed(2)} A${R1} ${R1} 0 0 1 ${(Math.sin(hw)*R1).toFixed(2)} ${(-Math.cos(hw)*R1).toFixed(2)} Z`,fill:"url(#coneGrad)"},cg);
+    hvEl("circle",{cx:meXY[0],cy:meXY[1],r:px(8),fill:"#2d8cff",stroke:"#fff","stroke-width":px(3)},layer);updateHeading()}
   $("hvNote").textContent=hvSynth?"Grafik nach Abschlagtafel · Distanzen ab Abschlag":"Du bist gerade nicht auf dieser Bahn";
   $("hvNote").hidden=hvSynth?false:(!(me&&!onHole)||!!viewRound);
 }
@@ -299,17 +304,52 @@ function setView(v){ui.view=v;save(K.ui,ui);const hole=v==="hole";
   if(hole)renderHoleView();else{map.invalidateSize();focusHole()}}
 window.addEventListener("resize",()=>{if(ui.view!=="sat")renderHoleView()});
 
+// ---------- Blickrichtung (Kompass) ----------
+let compassHeading=null,gpsHeading=null,headRaf=0,compassAsked=false;
+function screenAngle(){return (screen.orientation&&screen.orientation.angle)||window.orientation||0}
+function curHeading(){return compassHeading!=null?compassHeading:gpsHeading}
+function scheduleHeading(){if(!headRaf)headRaf=requestAnimationFrame(()=>{headRaf=0;updateHeading()})}
+function onOrient(e){let h=null;
+  if(e.webkitCompassHeading!=null&&!isNaN(e.webkitCompassHeading))h=e.webkitCompassHeading;       // iOS: 0 = Norden
+  else if(e.absolute&&e.alpha!=null)h=360-e.alpha;                                                  // Android
+  if(h==null)return;h=(h+screenAngle()+360)%360;
+  // leicht glätten, damit der Kegel nicht zittert
+  if(compassHeading==null)compassHeading=h;else{let d=((h-compassHeading+540)%360)-180;compassHeading=(compassHeading+d*0.35+360)%360}
+  scheduleHeading()}
+function startCompass(){
+  if("ondeviceorientationabsolute" in window)addEventListener("deviceorientationabsolute",onOrient);
+  else addEventListener("deviceorientation",onOrient)}
+// iOS erlaubt den Kompass nur nach einer Nutzeraktion: beim ersten Tippen nachfragen
+function askCompass(){if(compassAsked)return;compassAsked=true;
+  const D=window.DeviceOrientationEvent;
+  if(D&&typeof D.requestPermission==="function")D.requestPermission().then(r=>{if(r==="granted")startCompass()}).catch(()=>{});
+  else startCompass()}
+if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission!=="function")askCompass();
+else document.addEventListener("click",askCompass,{once:true,capture:true});
+function updateHeading(){const h=curHeading();
+  // Satellitenkarte: Norden oben, Kegel direkt drehen
+  const mc=meMarker&&meMarker.getElement()&&meMarker.getElement().querySelector(".mecone");
+  if(mc){mc.hidden=h==null;if(h!=null)mc.style.transform=`rotate(${h}deg)`}
+  // Bahngrafik: Grün oben, Richtung in das Bahn-Koordinatensystem umrechnen
+  const cg=document.getElementById("hvCone");if(!cg)return;
+  if(h==null||!me||!hvFrame){cg.setAttribute("visibility","hidden");return}
+  const a=h*rad,q=[me[0]+Math.cos(a)*20/R/rad,me[1]+Math.sin(a)*20/(R*Math.cos(me[0]*rad))/rad];
+  const p0=hvFrame.to(me),p1=hvFrame.to(q),ang=Math.atan2(p1[0]-p0[0],-(p1[1]-p0[1]))*180/Math.PI;
+  cg.setAttribute("transform",`translate(${p0[0]} ${p0[1]}) rotate(${ang.toFixed(1)})`);cg.setAttribute("visibility","visible")}
+
 // ---------- GPS ----------
 const st=document.getElementById("status");
 function setStatus(t,err){st.textContent=t;st.classList.toggle("err",!!err)}
 function setMe(p,acc){
   me=p;meAcc=acc;
-  if(!meMarker)meMarker=L.marker(p,{icon:icon("me"),interactive:false,zIndexOffset:1000}).addTo(map);else meMarker.setLatLng(p);
+  if(!meMarker){meMarker=L.marker(p,{icon:L.divIcon({className:"",html:'<div class="mewrap"><div class="mecone" hidden></div><div class="me"></div></div>',iconSize:[22,22],iconAnchor:[11,11]}),interactive:false,zIndexOffset:1000}).addTo(map);updateHeading()}else meMarker.setLatLng(p);
   if(acc){if(!accCircle)accCircle=L.circle(p,{radius:acc,color:"#2d8cff",weight:1,fillOpacity:.08,interactive:false}).addTo(map);else accCircle.setLatLng(p).setRadius(acc)}
   update();
 }
 if("geolocation" in navigator){
-  navigator.geolocation.watchPosition(pos=>{if(manualPos)return;const a=Math.round(pos.coords.accuracy);setStatus(`GPS ±${a} m`+(a>15?" · ungenau":""),a>25);setMe([pos.coords.latitude,pos.coords.longitude],pos.coords.accuracy)},
+  navigator.geolocation.watchPosition(pos=>{if(manualPos)return;
+    // Fallback ohne Kompass: Bewegungsrichtung aus GPS, nur beim Gehen verlässlich
+    const c=pos.coords;if(c.heading!=null&&!isNaN(c.heading)&&(c.speed||0)>0.7){gpsHeading=c.heading;if(compassHeading==null)scheduleHeading()}const a=Math.round(pos.coords.accuracy);setStatus(`GPS ±${a} m`+(a>15?" · ungenau":""),a>25);setMe([pos.coords.latitude,pos.coords.longitude],pos.coords.accuracy)},
     err=>{setStatus(err.code===1?"GPS nicht erlaubt – Standortzugriff in den Browser-Einstellungen freigeben":"Kein GPS-Signal",true)},
     {enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }else setStatus("Dieses Gerät bietet kein GPS",true);

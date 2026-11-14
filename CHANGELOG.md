@@ -2,6 +2,7 @@
 
 ## 2026-11-14
 
+- Viewing direction: a cone at the position marker shows where the phone points (compass), in the hole view and on the satellite map; falls back to the GPS walking direction. iOS asks for motion access on the first tap.
 - Hole view from the tee signs now covers all 18 holes (added 1, 3, 7, 8 incl. green depths)
 
 ## Unreleased
