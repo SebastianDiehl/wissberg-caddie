@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-14
+
+- Hole view from the tee signs now covers all 18 holes (added 1, 3, 7, 8 incl. green depths)
+
 ## Unreleased
 
 - Tournament mode in the player tab: hides the club recommendation (not allowed in competition under Rule 4.3); a "Turnier" badge shows in the header
